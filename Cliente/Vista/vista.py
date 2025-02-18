@@ -35,7 +35,7 @@ class ClienteVista:
         self.controlador.cargar_clientes()
 
     def mostrar_clientes(self, clientes):
-        """Llena la lista desplegable con los clientes obtenidos"""
+        #Llena la lista desplegable con los clientes obtenidos
         self.lista_clientes.options = [
             ft.dropdown.Option(str(cliente["id"]), cliente["nombre"])
             for cliente in clientes
@@ -58,12 +58,13 @@ class ClienteVista:
         texto = f"Cliente: {detalle['nombre']}\nNúmero de compras: {detalle['num_compras']}\n\n"
         
         for tarjeta in detalle['tarjetas']:
-            texto += f"Tarjeta ({tarjeta['nombre_banco']}): {tarjeta['numero_tarjeta']} - Cupo: {tarjeta['cupo_total']}\n"
+            texto += f"Tarjeta ({tarjeta['nombre_banco']}): {tarjeta['numero_tarjeta']} - Cupo: {tarjeta['cupo_total']} - Cupo Disponible: {tarjeta['cupo_utilizado']}\n"
+
 
         if detalle['compras']:
             texto += "\nCompras:\n"
             for compra in detalle['compras']:
-                texto += f"Fecha: {compra['fecha']}, Monto: {compra['monto']}, Descripción: {compra['descripcion']}\n"
+                texto += f" Tarjeta: {tarjeta['nombre_banco']} Fecha: {compra['fecha']}, Monto: {compra['monto']}, Descripción: {compra['descripcion']}\n"
 
         self.detalles_cliente.value = texto
         self.page.update()

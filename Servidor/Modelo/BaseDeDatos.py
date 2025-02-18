@@ -181,12 +181,15 @@ class BaseDeDatos:
             self.cursor.execute(query, tuple(params))
             compras = self.cursor.fetchall()
             
+            #print(cliente,tarjetas,compras)
             return cliente, tarjetas, compras
     
     # Metodo para obtener todos los clientes
     def obtener_clientes(self):
         self.cursor.execute("SELECT * FROM cliente")
         return self.cursor.fetchall()
+    
+
 
 
 
