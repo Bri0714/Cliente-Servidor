@@ -52,22 +52,25 @@ class ClienteVista:
         fecha_inicio = self.fecha_inicio.value or None
         fecha_fin = self.fecha_fin.value or None
         self.controlador.mostrar_detalle_cliente(int(id_cliente), fecha_inicio, fecha_fin)
+    
+    @staticmethod
+    def formatear_pesos(valor):
+        return f"${valor:,.0f} COP"  # Usa comas y no muestra decimales
         
     def mostrar_detalle(self, detalle):
         # Muestra la información del cliente, tarjetas y compras
         texto = f"Cliente: {detalle['nombre']}\nNúmero de compras: {detalle['num_compras']}\n\n"
         
         for tarjeta in detalle['tarjetas']:
-            texto += f"Tarjeta ({tarjeta['nombre_banco']}): {tarjeta['numero_tarjeta']} - Cupo Total: {tarjeta['cupo_total']} - Cupo Disponible: {tarjeta['cupo_disponible']}\n"
+            texto += f"Tarjeta ({tarjeta['nombre_banco']}): {tarjeta['numero_tarjeta']} - Cupo Total: {self.formatear_pesos(tarjeta['cupo_total'])} - Cupo Disponible: {self.formatear_pesos(tarjeta['cupo_disponible'])}\n"
 
         if detalle['compras']:
             texto += "\nCompras:\n"
             for compra in detalle['compras']:
-                texto += f" Tarjeta ({compra['nombre_banco']} - {compra['numero_tarjeta']}): Fecha: {compra['fecha']}, Monto: {compra['monto']}, Descripción: {compra['descripcion']}\n"
+                texto += f" Tarjeta ({compra['nombre_banco']} - {compra['numero_tarjeta']}): Fecha: {compra['fecha']}, Monto: {self.formatear_pesos(compra['monto'])}, Descripción: {compra['descripcion']}\n"
 
         self.detalles_cliente.value = texto
         self.page.update()
-
 
     def mostrar_mensaje(self, mensaje):
         #Muestra un mensaje de error o advertencia
