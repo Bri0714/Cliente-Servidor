@@ -21,8 +21,23 @@ class Controlador:
             return {
                 "nombre": cliente[0],
                 "num_compras": len(compras),
-                "tarjetas": [{"nombre_banco": t[0], "numero_tarjeta": t[1], "cupo_total": t[2]} for t in tarjetas],
-                "compras": [{"fecha": c[0], "monto": c[1], "descripcion": c[2]} for c in compras]
+                "tarjetas": [
+                    {
+                        "nombre_banco": t[0], 
+                        "numero_tarjeta": t[1],
+                        "cupo_total": t[2],
+                        "cupo_disponible": t[3]
+                    } 
+                    for t in tarjetas],
+                "compras": [
+                    {
+                        "fecha": c[0], 
+                        "monto": c[1], 
+                        "descripcion": c[2],
+                        "nombre_banco": c[3],
+                        "numero_tarjeta": c[4]
+                    } 
+                    for c in compras]
             }
         
         return {"error": "Acción no reconocida"}
