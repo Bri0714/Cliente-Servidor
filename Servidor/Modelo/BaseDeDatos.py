@@ -1,15 +1,19 @@
 import sqlite3
 from datetime import datetime
+import os
 
 class BaseDeDatos:
     
     # Constructor de la clase
-    def __init__(self, db_nombre='banco_universidad.db'):
-        try: 
+    def __init__(self, db_nombre=None):
+        # Si no se pasa un nombre, usa una ruta absoluta para el archivo
+        if db_nombre is None:
+            db_nombre = r"C:\Users\Usuario\Desktop\Proyecto Cliente - Servidor\Servidor\banco_universidad.db"
+
+        try:
             self.conexion = sqlite3.connect(db_nombre, check_same_thread=False)
             self.cursor = self.conexion.cursor()
             self.crear_tablas()
-            #self.precargar_datos() Para que no se vuelvan a replicar los datos cada vez que se inicie el servidor se crea el metodo verificar_y_precargar_datos
             self.verificar_y_precargar_datos()
             print('Conexión exitosa a la base de datos')
         except sqlite3.Error as e:
@@ -276,6 +280,41 @@ class BaseDeDatos:
         except sqlite3.Error as e:
             print(f"Error al registrar tarjeta: {e}")
             return None
+        
+    # Metodo para registrar una compra 
+    def registrar_compra(self, numero_tarjeta, fecha, monto, descripcion):
+        try:
+            # Consultar el cupo disponible de la tarjeta
+            self.cursor.execute("SELECT cupo_disponible FROM tarjeta WHERE numero_tarjeta = ?", (numero_tarjeta,))
+            resultado = self.cursor.fetchone()
+            if not resultado:
+                print("Tarjeta no encontrada")
+                return {"error": "Tarjeta no encontrada"}
+            cupo_disponible = resultado[0]
+            
+            # Validar que el monto no exceda el cupo disponible
+            if monto > cupo_disponible:
+                print("El monto supera el cupo disponible")
+                return {"error": "La compra no se ha podido realizar, ya que el cupo disponible es menor al monto de la compra"}
+            
+            # Insertar la compra
+            self.cursor.execute(
+                "INSERT INTO compras (numero_tarjeta, fecha, monto, descripcion) VALUES (?,?,?,?)",
+                (numero_tarjeta, fecha, monto, descripcion)
+            )
+            compra_id = self.cursor.lastrowid
+            
+            # Actualizar el cupo_disponible de la tarjeta
+            nuevo_cupo = cupo_disponible - monto
+            self.cursor.execute(
+                "UPDATE tarjeta SET cupo_disponible = ? WHERE numero_tarjeta = ?",
+                (nuevo_cupo, numero_tarjeta)
+            )
+            self.conexion.commit()
+            return {"compra_id": compra_id, "nuevo_cupo": nuevo_cupo}
+        except sqlite3.Error as e:
+            print(f"Error al registrar compra: {e}")
+            return {"error": "Error al registrar la compra"}
 
     # Metodo para obtener todos los clientes
     def obtener_clientes(self):

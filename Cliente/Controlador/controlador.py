@@ -1,11 +1,26 @@
 from Modelo.modelo import ClienteModelo
 import time
+import threading
 
 class ClienteControlador:
     def __init__(self, vista):
         self.modelo = ClienteModelo()
         self.vista = vista
         self.ultimo_detalle = None
+        
+        # Inicia un hilo en background para monitorizar la conexión
+        threading.Thread(target=self.monitor_conexion, daemon=True).start()
+        
+    def monitor_conexion(self):
+        """Monitorea la conexión al servidor cada 10 segundos y, si se detecta caída, intenta reconectar automáticamente."""
+        while True:
+            time.sleep(10)  # Revisa cada 10 segundos
+            respuesta = self.modelo.conectar()  # Realiza un ping
+            if "mensaje" not in respuesta:
+                # El servidor no respondió; mostrar mensaje y forzar reconexión
+                self.vista.mostrar_mensaje("El servidor se ha caído, reconectando...")
+                self.conectar_al_servidor()
+            # Si se recibe el "ping", no se hace nada (opcionalmente, podrías actualizar un estado en la vista)
 
     def conectar_al_servidor(self):
         max_reintentos = 5
@@ -43,6 +58,13 @@ class ClienteControlador:
         respuesta = self.modelo.enviar_peticion(datos)
         print("Respuesta del servidor:", respuesta)  # Debugging
         return respuesta
+    
+    def registrar_compra(self, datos):
+        # Envía la petición al servidor para registrar la compra
+        respuesta = self.modelo.enviar_peticion(datos)
+        print("Respuesta del servidor (compra):", respuesta)  # Mensaje de depuración
+        return respuesta
+
 
     #def cargar_clientes(self):
     #    #Obtiene la lista de clientes y la envía a la vista
@@ -82,3 +104,5 @@ class ClienteControlador:
             self.vista.mostrar_mensaje(detalle["error"])
         else:
             self.vista.mostrar_detalle(detalle)
+
+

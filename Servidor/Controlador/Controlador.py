@@ -120,3 +120,20 @@ class Controlador:
             if not id_cliente:
                 return {"error": "Error al registrar el cliente"}
             return {"id_cliente": id_cliente, "nombre": nombre, "sueldo": float(sueldo), "edad": edad, "mensaje": "Cliente creado correctamente"}
+        
+        # acción para registrar una compra
+        elif datos["accion"] == "registrar_compra":
+            numero_tarjeta = datos.get("numero_tarjeta")
+            fecha = datos.get("fecha")
+            monto = datos.get("monto")
+            descripcion = datos.get("descripcion")
+            if not (numero_tarjeta and fecha and monto and descripcion):
+                return {"error": "Faltan datos para registrar la compra"}
+            
+            resultado = self.db.registrar_compra(numero_tarjeta, fecha, monto, descripcion)
+            if "error" in resultado:
+                return resultado  # Retorna el mensaje de error
+            else:
+                return {"mensaje": "La compra ha sido registrada satisfactoriamente", "nuevo_cupo": resultado["nuevo_cupo"]}
+
+

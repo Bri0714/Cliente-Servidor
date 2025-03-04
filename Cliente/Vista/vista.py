@@ -12,6 +12,9 @@ class ClienteVista:
         self.cliente_id = None      # Guardará el id del cliente obtenido
         self.cliente_sueldo = None  # Para calcular cupo_total = 2 * sueldo
 
+        # Control para mostrar mensajes en pantalla (no se limpia al resetear)
+        self.lbl_mensaje = ft.Text(value="", color="green")
+        
         # CONTROLES EXISTENTES (consulta de tarjeta)
         self.txt_tarjeta = ft.TextField(label="Número de Tarjeta")
         self.fecha_inicio = ft.TextField(label="Fecha Inicio (YYYY-MM-DD)")
@@ -41,14 +44,24 @@ class ClienteVista:
         self.txt_nueva_edad = ft.TextField(label="Edad", visible=False)
         self.btn_siguiente_registro = ft.ElevatedButton("Siguiente", on_click=self.procesar_registro_cliente, visible=False)
         self.btn_atras = ft.ElevatedButton("Atrás", on_click=self.ocultar_registro, visible=False)
+        
         # CONTROLES PARA CREAR TARJETA (se muestran tras obtener el cliente)
         self.txt_nombre_banco = ft.TextField(label="Nombre del Banco", visible=False)
         self.txt_cupo_total = ft.TextField(label="Cupo Total (se calcula automáticamente)", visible=False, disabled=True)
         self.btn_crear_tarjeta = ft.ElevatedButton("Crear Tarjeta", on_click=self.registrar_tarjeta, visible=False)
+        
+        # CONTROLES NUEVOS PARA REGISTRAR COMPRA
+        self.btn_registrar_compra = ft.ElevatedButton("Registrar Compra", on_click=self.mostrar_formulario_compra, visible=False)
+        self.txt_fecha_compra = ft.TextField(label="Fecha de Compra (YYYY-MM-DD)", visible=False)
+        self.txt_monto_compra = ft.TextField(label="Monto", visible=False)
+        self.txt_descripcion_compra = ft.TextField(label="Descripción", visible=False)
+        self.btn_confirmar_compra = ft.ElevatedButton("Confirmar Compra", on_click=self.registrar_compra, visible=False)
+        self.btn_cancelar_compra = ft.ElevatedButton("Cancelar", on_click=self.ocultar_formulario_compra, visible=False)
 
         # Envolver todos los controles en un contenedor (Column) con scroll vertical
         scrollable_content = ft.Column(
             controls=[
+                self.lbl_mensaje,
                 self.btn_conectar,
                 self.txt_tarjeta,
                 self.fecha_inicio,
@@ -56,6 +69,13 @@ class ClienteVista:
                 self.btn_ver_detalles,
                 self.btn_compras,
                 self.detalles_cliente,
+                self.btn_registrar_compra,   # Botón para iniciar el registro de compra
+                # Formulario de registro de compra (inicialmente oculto)
+                self.txt_fecha_compra,
+                self.txt_monto_compra,
+                self.txt_descripcion_compra,
+                self.btn_confirmar_compra,
+                self.btn_cancelar_compra,
                 self.aviso_registro,
                 self.radio_group,
                 self.txt_cedula_existente,
@@ -75,8 +95,9 @@ class ClienteVista:
         self.page.add(scrollable_content)
         self.radio_group.on_change = self.on_radio_group_change
 
+    # Métodos para resetear y limpiar controles
     def resetear_vista(self):
-        """Oculta y limpia todos los controles de registro, detalles y compras previos."""
+        """Oculta y limpia todos los controles de registro, detalles, compras y formulario de compra (menos lbl_mensaje)."""
         self.detalles_cliente.value = ""
         self.aviso_registro.value = ""
         self.aviso_registro.visible = False
@@ -92,7 +113,14 @@ class ClienteVista:
         self.txt_cupo_total.visible = False
         self.btn_crear_tarjeta.visible = False
         self.btn_compras.disabled = True
-        # Limpiar contenidos de los campos (excepto el número de tarjeta, si se desea conservarlo)
+        # Ocultar formulario de compra
+        self.btn_registrar_compra.visible = False
+        self.txt_fecha_compra.visible = False
+        self.txt_monto_compra.visible = False
+        self.txt_descripcion_compra.visible = False
+        self.btn_confirmar_compra.visible = False
+        self.btn_cancelar_compra.visible = False
+        # Limpiar los contenidos de los campos (excepto lbl_mensaje)
         self.txt_cedula_existente.value = ""
         self.txt_nuevo_nombre.value = ""
         self.txt_nueva_cedula.value = ""
@@ -100,6 +128,9 @@ class ClienteVista:
         self.txt_nueva_edad.value = ""
         self.txt_nombre_banco.value = ""
         self.txt_cupo_total.value = ""
+        self.txt_fecha_compra.value = ""
+        self.txt_monto_compra.value = ""
+        self.txt_descripcion_compra.value = ""
         self.page.update()
 
     def limpiar_campos_registro_cliente(self):
@@ -111,6 +142,7 @@ class ClienteVista:
         self.txt_nueva_edad.value = ""
         self.page.update()
 
+    # Métodos de conexión y consulta
     def conectar_al_servidor(self, e):
         self.conectado = self.controlador.conectar_al_servidor()
         if self.conectado:
@@ -126,15 +158,17 @@ class ClienteVista:
 
     def ver_detalles(self, e):
         # Validar que se haya ingresado un número de tarjeta
-        if not self.txt_tarjeta.value:
-            self.mostrar_mensaje("Debe ingresar un número de tarjeta válido")
+        if not self.txt_tarjeta.value.strip():
+            self.resetear_vista()
+            self.lbl_mensaje.value = "Debe ingresar un número de tarjeta válido"
+            self.page.update()
             return
         # Conservar el número y reiniciar la vista para iniciar la búsqueda sin datos residuales
-        num = self.txt_tarjeta.value
+        num = self.txt_tarjeta.value.strip()
         self.resetear_vista()
         self.txt_tarjeta.value = num
-        fecha_inicio = self.fecha_inicio.value or None
-        fecha_fin = self.fecha_fin.value or None
+        fecha_inicio = self.fecha_inicio.value.strip() or None
+        fecha_fin = self.fecha_fin.value.strip() or None
         self.controlador.buscar_cliente_por_tarjeta(num, fecha_inicio, fecha_fin)
         self.page.update()
 
@@ -142,12 +176,12 @@ class ClienteVista:
         if "error" in detalle:
             # Si la tarjeta no existe, se muestra la sección de registro
             self.mostrar_registro_tarjeta()
-            self.mostrar_mensaje(detalle["error"])
+            self.lbl_mensaje.value = detalle["error"]
         else:
             texto = f"Titular: {detalle['nombre']}\n"
             card = None
             for t in detalle['tarjetas']:
-                if t['numero_tarjeta'] == self.txt_tarjeta.value:
+                if t['numero_tarjeta'] == self.txt_tarjeta.value.strip():
                     card = t
                     break
             if card:
@@ -157,15 +191,19 @@ class ClienteVista:
             texto += f"Número de compras: {detalle['num_compras']}\n"
             self.detalles_cliente.value = texto
             self.btn_compras.disabled = False if detalle['compras'] else True
+            # Habilitar el botón para registrar compra
+            self.btn_registrar_compra.visible = True
         self.page.update()
 
     def mostrar_compras(self, e):
         if self.controlador.ultimo_detalle is None:
-            self.mostrar_mensaje("Primero vea los detalles de la tarjeta")
+            self.lbl_mensaje.value = "Primero vea los detalles de la tarjeta"
+            self.page.update()
             return
         compras = self.controlador.ultimo_detalle.get("compras", [])
         if not compras:
-            self.mostrar_mensaje("No hay compras para mostrar")
+            self.lbl_mensaje.value = "No hay compras para mostrar"
+            self.page.update()
             return
         texto = "Compras:\n"
         for compra in compras:
@@ -177,10 +215,73 @@ class ClienteVista:
         self.detalles_cliente.value = texto
         self.page.update()
 
+    # --- Sección de registro de compra ---
+    def mostrar_formulario_compra(self, e):
+        # Hace visibles los controles para registrar la compra
+        self.txt_fecha_compra.visible = True
+        self.txt_monto_compra.visible = True
+        self.txt_descripcion_compra.visible = True
+        self.btn_confirmar_compra.visible = True
+        self.btn_cancelar_compra.visible = True
+        # Opcional: se pueden asignar valores por defecto, p.ej. la fecha actual
+        self.txt_fecha_compra.value = ""
+        self.txt_monto_compra.value = ""
+        self.txt_descripcion_compra.value = ""
+        self.page.update()
+
+    def ocultar_formulario_compra(self, e):
+        # Oculta y limpia el formulario de compra
+        self.txt_fecha_compra.visible = False
+        self.txt_monto_compra.visible = False
+        self.txt_descripcion_compra.visible = False
+        self.btn_confirmar_compra.visible = False
+        self.btn_cancelar_compra.visible = False
+        self.txt_fecha_compra.value = ""
+        self.txt_monto_compra.value = ""
+        self.txt_descripcion_compra.value = ""
+        self.page.update()
+
+    def registrar_compra(self, e):
+        # Método para registrar una compra
+        fecha = self.txt_fecha_compra.value.strip()
+        monto = self.txt_monto_compra.value.strip()
+        descripcion = self.txt_descripcion_compra.value.strip()
+        numero_tarjeta = self.txt_tarjeta.value.strip()  # Se utiliza el número ingresado previamente
+        if not (fecha and monto and descripcion):
+            self.lbl_mensaje.value = "Complete todos los datos de la compra"
+            self.page.update()
+            return
+        try:
+            monto = float(monto)
+        except ValueError:
+            self.lbl_mensaje.value = "El monto debe ser numérico"
+            self.page.update()
+            return
+        datos = {
+            "accion": "registrar_compra",
+            "numero_tarjeta": numero_tarjeta,
+            "fecha": fecha,
+            "monto": monto,
+            "descripcion": descripcion
+        }
+        respuesta = self.controlador.modelo.enviar_peticion(datos)
+        if respuesta is None:
+            self.lbl_mensaje.value = "Error de conexión: No se recibió respuesta del servidor"
+        elif "mensaje" in respuesta:
+            self.lbl_mensaje.value = respuesta["mensaje"]
+        else:
+            self.lbl_mensaje.value = respuesta.get("error", "No se pudo registrar la compra")
+        # Actualizar detalles para ver el cupo actualizado
+        self.controlador.buscar_cliente_por_tarjeta(numero_tarjeta)
+        self.resetear_vista()
+        self.page.update()
+
+
+    # --- Sección de registro de tarjeta y cliente (ya existente) ---
     def mostrar_registro_tarjeta(self):
         self.resetear_vista()
         self.aviso_registro.value = ("El número de la tarjeta no se encuentra registrado. "
-                                     "Registre el cliente para crear una tarjeta.")
+                                    "Registre el cliente para crear una tarjeta.")
         self.aviso_registro.visible = True
         self.radio_group.visible = True
         self.btn_siguiente_registro.visible = True
@@ -203,15 +304,16 @@ class ClienteVista:
         self.page.update()
 
     def procesar_registro_cliente(self, e):
-        # Este método se invoca al presionar "Siguiente" en la sección de registro
         if self.radio_group.value == "registrado":
-            cedula = self.txt_cedula_existente.value
+            cedula = self.txt_cedula_existente.value.strip()
             if not cedula:
-                self.mostrar_mensaje("Ingrese la cédula del cliente")
+                self.lbl_mensaje.value = "Ingrese la cédula del cliente"
+                self.page.update()
                 return
             respuesta = self.controlador.buscar_cliente_por_cedula(cedula)
             if "error" in respuesta:
-                self.mostrar_mensaje(f"Cliente con cédula {cedula} no ha sido encontrado")
+                self.lbl_mensaje.value = f"Cliente con cédula {cedula} no ha sido encontrado"
+                self.page.update()
                 return
             else:
                 self.cliente_id = respuesta.get("id_cliente")
@@ -220,22 +322,25 @@ class ClienteVista:
                 self.limpiar_campos_registro_cliente()
                 self.mostrar_campos_tarjeta()
         elif self.radio_group.value == "nuevo":
-            nombre = self.txt_nuevo_nombre.value
-            cedula = self.txt_nueva_cedula.value
-            sueldo = self.txt_nuevo_sueldo.value
-            edad = self.txt_nueva_edad.value
+            nombre = self.txt_nuevo_nombre.value.strip()
+            cedula = self.txt_nueva_cedula.value.strip()
+            sueldo = self.txt_nuevo_sueldo.value.strip()
+            edad = self.txt_nueva_edad.value.strip()
             if not (nombre and cedula and sueldo and edad):
-                self.mostrar_mensaje("Complete todos los datos del nuevo cliente")
+                self.lbl_mensaje.value = "Complete todos los datos del nuevo cliente"
+                self.page.update()
                 return
             try:
                 sueldo = float(sueldo)
                 edad = int(edad)
             except:
-                self.mostrar_mensaje("Sueldo debe ser numérico y edad entera")
+                self.lbl_mensaje.value = "Sueldo debe ser numérico y edad entera"
+                self.page.update()
                 return
             respuesta = self.controlador.registrar_cliente_nuevo(nombre, cedula, sueldo, edad)
             if "error" in respuesta:
-                self.mostrar_mensaje(respuesta["error"])
+                self.lbl_mensaje.value = respuesta["error"]
+                self.page.update()
                 return
             else:
                 self.cliente_id = respuesta.get("id_cliente")
@@ -246,7 +351,6 @@ class ClienteVista:
         self.page.update()
 
     def limpiar_campos_registro_cliente(self):
-        """Limpia los campos de registro del cliente."""
         self.txt_cedula_existente.value = ""
         self.txt_nuevo_nombre.value = ""
         self.txt_nueva_cedula.value = ""
@@ -255,7 +359,6 @@ class ClienteVista:
         self.page.update()
 
     def mostrar_campos_tarjeta(self):
-        # Oculta los controles de registro y muestra los campos para crear la tarjeta
         self.aviso_registro.visible = False
         self.radio_group.visible = False
         self.txt_cedula_existente.visible = False
@@ -265,12 +368,9 @@ class ClienteVista:
         self.txt_nueva_edad.visible = False
         self.btn_siguiente_registro.visible = False
         self.btn_atras.visible = False
-        # Mostrar los campos para la tarjeta
         self.txt_nombre_banco.visible = True
         self.txt_cupo_total.visible = True
         self.btn_crear_tarjeta.visible = True
-        # Pre-cargar el número de tarjeta (el mismo ingresado al inicio)
-        # Calcular cupo_total como el doble del sueldo del cliente
         if self.cliente_sueldo is not None:
             computed_cupo = 2 * self.cliente_sueldo
             self.txt_cupo_total.value = str(computed_cupo)
@@ -282,33 +382,35 @@ class ClienteVista:
 
     def registrar_tarjeta(self, e):
         if not self.cliente_id:
-            self.mostrar_mensaje("No se ha obtenido el cliente. Registre el cliente primero.")
+            self.lbl_mensaje.value = "No se ha obtenido el cliente. Registre el cliente primero."
+            self.page.update()
             return
-        nombre_banco = self.txt_nombre_banco.value
-        cupo_total = self.txt_cupo_total.value  # Ya calculado automáticamente
-        numero_tarjeta = self.txt_tarjeta.value  # Se utiliza el número ingresado al inicio
+        nombre_banco = self.txt_nombre_banco.value.strip()
+        cupo_total = self.txt_cupo_total.value.strip()
+        numero_tarjeta = self.txt_tarjeta.value.strip()
         if not (nombre_banco and cupo_total and numero_tarjeta):
-            self.mostrar_mensaje("Complete todos los datos de la tarjeta")
+            self.lbl_mensaje.value = "Complete todos los datos de la tarjeta"
+            self.page.update()
+            return
+        try:
+            cupo_total = float(cupo_total)
+        except ValueError:
+            self.lbl_mensaje.value = "El cupo total debe ser un número"
+            self.page.update()
             return
         datos = {
             "accion": "registrar_tarjeta",
-            "tipo_cliente": "registrado",  # Se asume que el cliente ya está creado
+            "tipo_cliente": "registrado",
             "id_cliente": self.cliente_id,
             "nombre_banco": nombre_banco,
             "numero_tarjeta": numero_tarjeta,
-            "cupo_total": None
+            "cupo_total": cupo_total
         }
-        try:
-            datos["cupo_total"] = float(cupo_total)
-        except ValueError:
-            self.mostrar_mensaje("El cupo total debe ser un número")
-            return
         respuesta = self.controlador.registrar_tarjeta(datos)
         if "mensaje" in respuesta:
-            self.mostrar_mensaje(f"Tarjeta de crédito del banco {nombre_banco} creada correctamente")
+            self.lbl_mensaje.value = f"Tarjeta de crédito del banco {nombre_banco} creada correctamente"
         else:
-            self.mostrar_mensaje(respuesta.get("error", "No se ha podido crear la tarjeta"))
-        # Actualiza el detalle (opcional) y luego limpia la vista
+            self.lbl_mensaje.value = respuesta.get("error", "No se ha podido crear la tarjeta")
         self.controlador.buscar_cliente_por_tarjeta(numero_tarjeta)
         self.resetear_vista()
         self.page.update()
@@ -318,10 +420,8 @@ class ClienteVista:
         return f"${valor:,.0f} COP"
 
     def mostrar_mensaje(self, mensaje):
-        self.page.snack_bar = ft.SnackBar(ft.Text(mensaje), duration=3)
-        self.page.snack_bar.open = True
+        self.lbl_mensaje.value = mensaje
         self.page.update()
-
 
 
     #def cargar_clientes(self, e):
