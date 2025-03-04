@@ -20,12 +20,15 @@ class BaseDeDatos:
         try:
             # Tabla cliente
             self.cursor.execute(
-                """
-                CREATE TABLE IF NOT EXISTS cliente(
-                    id_cliente INTEGER PRIMARY KEY AUTOINCREMENT,
-                    nombre TEXT NOT NULL
-                )
-                """
+            """
+            CREATE TABLE IF NOT EXISTS cliente(
+                id_cliente INTEGER PRIMARY KEY AUTOINCREMENT,
+                nombre TEXT NOT NULL,
+                cedula TEXT NOT NULL,
+                sueldo REAL NOT NULL,
+                edad INTEGER NOT NULL
+            )
+            """
             )
             print('Tabla Cliente creada con éxito')
 
@@ -80,18 +83,18 @@ class BaseDeDatos:
         try:
             self.cursor.executescript(
                 """
-                -- Insertar clientes
-                INSERT INTO cliente (nombre) VALUES
-                ('Juan Pérez'),
-                ('María Gómez'),
-                ('Carlos Rodríguez'),
-                ('Laura Sánchez'),
-                ('Andrés Fernández'),
-                ('Diana Castro'),
-                ('Sergio Ramírez'),
-                ('Valentina López'),
-                ('Felipe Morales'),
-                ('Camila Vargas');
+                -- Insertar clientes con los nuevos campos
+                INSERT INTO cliente (nombre, cedula, sueldo, edad) VALUES
+                ('Juan Pérez', '123456789', 2500000, 30),
+                ('María Gómez', '987654321', 3000000, 28),
+                ('Carlos Rodríguez', '456789123', 2800000, 35),
+                ('Laura Sánchez', '321654987', 3200000, 40),
+                ('Andrés Fernández', '654321987', 2700000, 33),
+                ('Diana Castro', '789123456', 2900000, 29),
+                ('Sergio Ramírez', '159753486', 3100000, 37),
+                ('Valentina López', '357159486', 2600000, 31),
+                ('Felipe Morales', '852741963', 3300000, 42),
+                ('Camila Vargas', '963852741', 2400000, 27);
 
                 -- Insertar tarjetas con bancos colombianos
                 INSERT INTO tarjeta (id_cliente, nombre_banco, numero_tarjeta, cupo_total, cupo_disponible) VALUES
@@ -120,6 +123,21 @@ class BaseDeDatos:
                 INSERT INTO compras (numero_tarjeta, fecha, monto, descripcion) VALUES
                 ('1111-2222-3333-4444', '2025-02-01', 200000, 'Compra en supermercado'),
                 ('1111-2222-3333-4444', '2025-02-05', 300000, 'Pago de servicios'),
+                ('1111-2222-3333-4444', '2025-02-01', 200000, 'Compra en supermercado'),
+                ('1111-2222-3333-4444', '2025-02-05', 300000, 'Pago de servicios'),
+                ('1111-2222-3333-4444', '2025-02-10', 150000, 'Compra en farmacia'),
+                ('1111-2222-3333-4444', '2025-02-15', 250000, 'Restaurante'),
+                ('1111-2222-3333-4444', '2025-02-20', 100000, 'Gasolina'),
+                ('1111-2222-3333-4444', '2025-02-25', 400000, 'Compra en línea'),
+                ('1111-2222-3333-4444', '2025-03-01', 500000, 'Electrodomésticos'),
+                ('1111-2222-3333-4444', '2025-03-05', 200000, 'Pago de internet'),
+                ('1111-2222-3333-4444', '2025-03-10', 300000, 'Compra en ferretería'),
+                ('1111-2222-3333-4444', '2025-03-15', 150000, 'Cine y entretenimiento'),
+                ('1111-2222-3333-4444', '2025-03-20', 600000, 'Compra de tecnología'),
+                ('1111-2222-3333-4444', '2025-03-25', 200000, 'Taxi y transporte'),
+                ('1111-2222-3333-4444', '2025-03-30', 100000, 'Compra en librería'),
+                ('1111-2222-3333-4444', '2025-04-01', 300000, 'Pago de servicios públicos'),
+                ('1111-2222-3333-4444', '2025-04-05', 500000, 'Cena en restaurante'),
                 ('5555-6666-7777-8888', '2025-02-02', 400000, 'Compra en tienda de ropa'),
                 ('5555-6666-7777-8888', '2025-02-06', 500000, 'Restaurante'),
                 ('2222-3333-4444-5555', '2025-02-07', 600000, 'Gasolina'),
@@ -188,15 +206,79 @@ class BaseDeDatos:
             
             #print(cliente,tarjetas,compras)
             return cliente, tarjetas, compras
+        
+    def obtener_detalle_por_tarjeta(self, numero_tarjeta, fecha_inicio=None, fecha_fin=None):
+        # Se consulta la tarjeta incluyendo el número de tarjeta
+        self.cursor.execute(
+            "SELECT id_cliente, nombre_banco, numero_tarjeta, cupo_total, cupo_disponible FROM tarjeta WHERE numero_tarjeta = ?",
+            (numero_tarjeta,)
+        )
+        tarjeta = self.cursor.fetchone()
+        if not tarjeta:
+            print("Tarjeta no encontrada")
+            return None, None, None  # Tarjeta no encontrada
+
+        id_cliente = tarjeta[0]
+
+        # Obtenemos el nombre del cliente
+        self.cursor.execute("SELECT nombre FROM cliente WHERE id_cliente = ?", (id_cliente,))
+        cliente = self.cursor.fetchone()
+
+        # Consulta de compras filtrada solo por el número de tarjeta (y opcionalmente por fechas)
+        query = """
+                SELECT c.fecha, c.monto, c.descripcion, t.nombre_banco, t.numero_tarjeta
+                FROM compras c
+                JOIN tarjeta t ON c.numero_tarjeta = t.numero_tarjeta
+                WHERE c.numero_tarjeta = ?
+                """
+        params = [numero_tarjeta]
+        if fecha_inicio and fecha_fin:
+            query += " AND c.fecha BETWEEN ? AND ?"
+            params.extend([fecha_inicio, fecha_fin])
+        
+        self.cursor.execute(query, tuple(params))
+        compras = self.cursor.fetchall()
+        
+        return cliente, [tarjeta], compras
+
+    # Metodo para obtener el cliente por cedula 
+    def obtener_cliente_por_cedula(self, cedula):
+        try:
+            self.cursor.execute("SELECT id_cliente, nombre, sueldo, edad FROM cliente WHERE cedula = ?", (cedula,))
+            return self.cursor.fetchone()
+        except sqlite3.Error as e:
+            print(f"Error al obtener cliente por cédula: {e}")
+            return None
+        
+    # Metodo para registrar un cliente 
+    def registrar_cliente(self, nombre, cedula, sueldo, edad):
+        try:
+            self.cursor.execute(
+                "INSERT INTO cliente (nombre, cedula, sueldo, edad) VALUES (?,?,?,?)",
+                (nombre, cedula, sueldo, edad)
+            )
+            self.conexion.commit()
+            return self.cursor.lastrowid  # Retorna el id del cliente creado
+        except sqlite3.Error as e:
+            print(f"Error al registrar cliente: {e}")
+            return None
     
+    # Metodo para registrar una TARJETA 
+    def registrar_tarjeta(self, id_cliente, nombre_banco, numero_tarjeta, cupo_total):
+        try:
+            # Inserta la tarjeta y asigna cupo_disponible igual al cupo_total
+            self.cursor.execute(
+                "INSERT INTO tarjeta (id_cliente, nombre_banco, numero_tarjeta, cupo_total, cupo_disponible) VALUES (?,?,?,?,?)",
+                (id_cliente, nombre_banco, numero_tarjeta, cupo_total, cupo_total)
+            )
+            self.conexion.commit()
+            return self.cursor.lastrowid  # Retorna el id de la tarjeta creada
+        except sqlite3.Error as e:
+            print(f"Error al registrar tarjeta: {e}")
+            return None
+
     # Metodo para obtener todos los clientes
     def obtener_clientes(self):
         self.cursor.execute("SELECT * FROM cliente")
         return self.cursor.fetchall()
     
-
-
-
-
-
-
