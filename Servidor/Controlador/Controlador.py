@@ -94,10 +94,13 @@ class Controlador:
         elif datos["accion"] == "liberar_tarjeta":
             numero_tarjeta = datos["numero_tarjeta"]
             with self.bloqueo:
+                # Verificar existencia antes de eliminar
                 if numero_tarjeta in self.tarjetas_bloqueadas:
                     del self.tarjetas_bloqueadas[numero_tarjeta]
-            print(f"Tarjeta {numero_tarjeta} liberada")
-            return {"mensaje": "Tarjeta liberada"}
+                    print(f"✅ Tarjeta {numero_tarjeta} liberada")
+                else:
+                    print(f"⚠️ Tarjeta {numero_tarjeta} no estaba bloqueada")
+            return {"mensaje": "Operación completada"}
 
         # Nueva acción para registrar una tarjeta
         elif datos["accion"] == "registrar_tarjeta":

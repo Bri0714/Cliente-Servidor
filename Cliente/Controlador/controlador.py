@@ -46,26 +46,56 @@ class ClienteControlador:
         self.vista.mostrar_mensaje(error_msg)
         self.vista.page.window.destroy()  # O el método correspondiente para cerrar la aplicación
     
+    #def buscar_cliente_por_tarjeta(self, numero_tarjeta, fecha_inicio=None, fecha_fin=None):
+    #    # Liberar tarjeta anterior
+    #    if self.tarjeta_actual:
+    #        self.liberar_tarjeta(self.tarjeta_actual)
+    #    
+    #    # Bloquear nueva tarjeta
+    #    self.tarjeta_actual = numero_tarjeta
+    #    detalle = self.modelo.obtener_detalle_por_tarjeta(numero_tarjeta, fecha_inicio, fecha_fin)
+    #    
+    #    if "error" in detalle and "ya está siendo consultado" in detalle["error"]:
+    #        self.vista.mostrar_mensaje(detalle["error"])
+    #        self.tarjeta_actual = None
+    #    else:
+    #        self.ultimo_detalle = detalle
+    #        self.vista.mostrar_detalle(detalle)
+#
+    #def liberar_tarjeta(self, numero_tarjeta):
+    #    datos = {"accion": "liberar_tarjeta", "numero_tarjeta": numero_tarjeta}
+    #    self.modelo.enviar_peticion(datos)
+    #    self.tarjeta_actual = None
+    
+    # Liberar tarjeta anterior ANTES de asignar la nueva
     def buscar_cliente_por_tarjeta(self, numero_tarjeta, fecha_inicio=None, fecha_fin=None):
-        # Liberar tarjeta anterior
         if self.tarjeta_actual:
             self.liberar_tarjeta(self.tarjeta_actual)
+            self.tarjeta_actual = None  # Asegurar que se borra la referencia
         
-        # Bloquear nueva tarjeta
-        self.tarjeta_actual = numero_tarjeta
+        # Bloquear nueva tarjeta SOLO si la consulta es exitosa
         detalle = self.modelo.obtener_detalle_por_tarjeta(numero_tarjeta, fecha_inicio, fecha_fin)
         
-        if "error" in detalle and "ya está siendo consultado" in detalle["error"]:
-            self.vista.mostrar_mensaje(detalle["error"])
-            self.tarjeta_actual = None
+        if "error" in detalle:
+            if "ya está siendo consultado" in detalle["error"]:
+                self.vista.mostrar_mensaje(detalle["error"])
+            return
         else:
+            self.tarjeta_actual = numero_tarjeta  # Asignar solo si no hay error
             self.ultimo_detalle = detalle
             self.vista.mostrar_detalle(detalle)
 
     def liberar_tarjeta(self, numero_tarjeta):
-        datos = {"accion": "liberar_tarjeta", "numero_tarjeta": numero_tarjeta}
-        self.modelo.enviar_peticion(datos)
-        self.tarjeta_actual = None
+        if numero_tarjeta:
+            datos = {"accion": "liberar_tarjeta", "numero_tarjeta": numero_tarjeta}
+            try:
+                # Enviar liberación y esperar confirmación
+                respuesta = self.modelo.enviar_peticion(datos)
+                print(f"Liberación exitosa de tarjeta {numero_tarjeta}: {respuesta}")
+            except Exception as e:
+                print(f"Error al liberar tarjeta: {str(e)}")
+            finally:
+                self.tarjeta_actual = None
 
     def registrar_tarjeta(self, datos):
         respuesta = self.modelo.enviar_peticion(datos)

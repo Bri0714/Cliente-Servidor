@@ -354,7 +354,7 @@ class BaseDeDatos:
                 return {"error": "El monto de pago debe ser igual al monto de la compra"}
             
             # Eliminar la compra (o marcarla como pagada)
-            self.cursor.execute("DELETE FROM compras WHERE id = ?", (id_compra,))
+            #self.cursor.execute("DELETE FROM compras WHERE id = ?", (id_compra,))
             
             # Actualizar el cupo_disponible: se suma el monto pagado (liberando crédito)
             self.cursor.execute("SELECT cupo_disponible FROM tarjeta WHERE numero_tarjeta = ?", (numero_tarjeta,))

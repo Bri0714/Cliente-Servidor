@@ -12,6 +12,9 @@ class ClienteVista:
         self.conectado = False
         self.cliente_id = None      # Guardará el id del cliente obtenido
         self.cliente_sueldo = None  # Para calcular cupo_total = 2 * sueldo
+        page.window_prevent_close = True
+        page.on_window_event = self.on_window_event
+
 
         # Control para mostrar mensajes en pantalla (no se limpia al resetear)
         self.lbl_mensaje = ft.Text(value="", color="green")
@@ -114,6 +117,15 @@ class ClienteVista:
         self.page.add(scrollable_content)
         self.radio_group.on_change = self.on_radio_group_change
 
+    def on_window_event(self, e):
+        if e.data == "close":
+            # Liberar tarjeta antes de cerrar
+            if self.controlador.tarjeta_actual:
+                self.controlador.liberar_tarjeta(
+                    self.controlador.tarjeta_actual
+                )
+            self.page.window_destroy()
+            
     # Método para limpiar lbl_mensaje después de 60 segundos
     def mostrar_mensaje_temporal(self, mensaje):
         self.lbl_mensaje.value = mensaje
@@ -464,18 +476,39 @@ class ClienteVista:
         self.page.update()
 
     # --- Sección de registro de PAGO ---
+    #def llenar_dropdown_pago(self, compras):
+    #    """Llena el dropdown con las compras pendientes.
+    #    Cada opción tendrá el formato: "id_compra|descripcion|monto"
+    #    """
+    #    opciones = []
+    #    for compra in compras:
+    #        # Se asume que cada compra es un diccionario con claves "id", "descripcion" y "monto"
+    #        opcion_texto = f"{compra['id']}|{compra['descripcion']}|{self.formatear_pesos(compra['monto'])}"
+    #        opciones.append(ft.dropdown.Option(text=opcion_texto))
+    #    self.dropdown_compras_pago.options = opciones
+    #    if opciones:
+    #        self.dropdown_compras_pago.value = opciones[0].text
+    #    else:
+    #        self.dropdown_compras_pago.value = ""
+    #    self.page.update()
+    
     def llenar_dropdown_pago(self, compras):
-        """Llena el dropdown con las compras pendientes.
-        Cada opción tendrá el formato: "id_compra|descripcion|monto"
-        """
         opciones = []
         for compra in compras:
-            # Se asume que cada compra es un diccionario con claves "id", "descripcion" y "monto"
-            opcion_texto = f"{compra['id']}|{compra['descripcion']}|{compra['monto']}"
-            opciones.append(ft.dropdown.Option(text=opcion_texto))
+            # Texto formateado para mostrar
+            texto_formateado = f"{compra['descripcion']} - {self.formatear_pesos(compra['monto'])}"
+            # Clave con los datos originales (incluyendo el float)
+            clave = f"{compra['id']}|{compra['descripcion']}|{compra['monto']}"
+            opciones.append(
+                ft.dropdown.Option(
+                    text=texto_formateado,  # Muestra el formato bonito
+                    key=clave  # Guarda los datos originales como string
+                )
+            )
+        
         self.dropdown_compras_pago.options = opciones
         if opciones:
-            self.dropdown_compras_pago.value = opciones[0].text
+            self.dropdown_compras_pago.value = opciones[0].key  # Usa la clave, no el texto
         else:
             self.dropdown_compras_pago.value = ""
         self.page.update()
