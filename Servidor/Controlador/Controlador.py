@@ -1,8 +1,11 @@
 from Modelo.BaseDeDatos import BaseDeDatos
+from threading import Lock
 
 class Controlador:
     def __init__(self):
         self.db = BaseDeDatos()
+        self.bloqueo = Lock()
+        self.tarjetas_bloqueadas = {}  # Diccionario para bloquear tarjetas
     
     def procesar_peticion(self, datos):
         
@@ -35,11 +38,12 @@ class Controlador:
                     for t in tarjetas],
                 "compras": [
                     {
-                        "fecha": c[0], 
-                        "monto": c[1], 
-                        "descripcion": c[2],
-                        "nombre_banco": c[3],
-                        "numero_tarjeta": c[4]
+                        "id": c[0],
+                        "fecha": c[1], 
+                        "monto": c[2], 
+                        "descripcion": c[3],
+                        "nombre_banco": c[4],
+                        "numero_tarjeta": c[5]
                     } 
                     for c in compras]
             }
@@ -47,6 +51,13 @@ class Controlador:
         # Nueva acción para obtener el detalle de una tarjeta
         elif datos["accion"] == "detalle_tarjeta":
             numero_tarjeta = datos.get("numero_tarjeta")
+            
+            with self.bloqueo:
+                if numero_tarjeta in self.tarjetas_bloqueadas:
+                    print(f"El número de tarjeta {numero_tarjeta} ya está siendo consultado. Intente con otro.")
+                    return {"error": f"El número de tarjeta {numero_tarjeta} ya está siendo consultado. Intente con otro."}
+                self.tarjetas_bloqueadas[numero_tarjeta] = True 
+                
             fecha_inicio = datos.get("fecha_inicio")
             fecha_fin = datos.get("fecha_fin")
             
@@ -68,15 +79,25 @@ class Controlador:
                 ],
                 "compras": [
                     {
-                        "fecha": c[0], 
-                        "monto": c[1], 
-                        "descripcion": c[2],
-                        "nombre_banco": c[3],
-                        "numero_tarjeta": c[4]
+                        "id": c[0],  # <- ¡Corregido! Incluye el id de la compra
+                        "fecha": c[1], 
+                        "monto": c[2], 
+                        "descripcion": c[3],
+                        "nombre_banco": c[4],
+                        "numero_tarjeta": c[5]
                     } 
                     for c in compras
                 ]
             }
+        
+        # Nueva acción para liberar tarjeta
+        elif datos["accion"] == "liberar_tarjeta":
+            numero_tarjeta = datos["numero_tarjeta"]
+            with self.bloqueo:
+                if numero_tarjeta in self.tarjetas_bloqueadas:
+                    del self.tarjetas_bloqueadas[numero_tarjeta]
+            print(f"Tarjeta {numero_tarjeta} liberada")
+            return {"mensaje": "Tarjeta liberada"}
 
         # Nueva acción para registrar una tarjeta
         elif datos["accion"] == "registrar_tarjeta":
@@ -135,5 +156,20 @@ class Controlador:
                 return resultado  # Retorna el mensaje de error
             else:
                 return {"mensaje": "La compra ha sido registrada satisfactoriamente", "nuevo_cupo": resultado["nuevo_cupo"]}
+            
+        # accion generar pago 
+        elif datos["accion"] == "registrar_pago":
+            numero_tarjeta = datos.get("numero_tarjeta")
+            id_compra = datos.get("id_compra")
+            fecha_pago = datos.get("fecha_pago")
+            monto_pagado = datos.get("monto_pagado")
+            descripcion = datos.get("descripcion")
+            if not (numero_tarjeta and fecha_pago and monto_pagado and descripcion):
+                print("Faltan datos para registrar el pago")
+                return {"error": "Faltan datos para registrar el pago"}
+            
+            resultado = self.db.registrar_pago(numero_tarjeta,id_compra, fecha_pago, monto_pagado, descripcion)
+            return resultado
+
 
 

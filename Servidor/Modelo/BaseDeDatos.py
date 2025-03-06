@@ -1,6 +1,6 @@
 import sqlite3
 from datetime import datetime
-import os
+import math
 
 class BaseDeDatos:
     
@@ -51,6 +51,23 @@ class BaseDeDatos:
                 """
             )
             print('Tabla Tarjeta creada con éxito')
+            
+
+            # Tabla pago
+            self.cursor.execute(
+                """
+                CREATE TABLE IF NOT EXISTS pago(
+                    id_pago INTEGER PRIMARY KEY AUTOINCREMENT,
+                    id_compra INTEGER,
+                    numero_tarjeta TEXT,
+                    fecha_pago TEXT,
+                    monto_a_pagar REAL,
+                    descripcion TEXT,
+                    FOREIGN KEY (id_compra) REFERENCES compras(id)
+                )
+                """
+            )
+            print('Tabla Pago creada con éxito')
 
             # Tabla compras
             self.cursor.execute(
@@ -230,7 +247,7 @@ class BaseDeDatos:
 
         # Consulta de compras filtrada solo por el número de tarjeta (y opcionalmente por fechas)
         query = """
-                SELECT c.fecha, c.monto, c.descripcion, t.nombre_banco, t.numero_tarjeta
+                SELECT c.id, c.fecha, c.monto, c.descripcion, t.nombre_banco, t.numero_tarjeta
                 FROM compras c
                 JOIN tarjeta t ON c.numero_tarjeta = t.numero_tarjeta
                 WHERE c.numero_tarjeta = ?
@@ -315,6 +332,46 @@ class BaseDeDatos:
         except sqlite3.Error as e:
             print(f"Error al registrar compra: {e}")
             return {"error": "Error al registrar la compra"}
+        
+    # Metodo para generar un pago 
+    def registrar_pago(self, numero_tarjeta, id_compra, fecha_pago, monto_pagado, descripcion):
+        try:
+            # Buscar la compra usando el id_compra
+            print(f"[DEBUG] Datos recibidos: id_compra={id_compra}, monto={monto_pagado}, fecha={fecha_pago}")  # Depuración
+        
+            # Validar formato de fecha
+            datetime.strptime(fecha_pago, "%Y-%m-%d")
+            
+            self.cursor.execute("SELECT monto FROM compras WHERE id = ?", (id_compra,))
+            compra = self.cursor.fetchone()
+            if not compra:
+                print(f"❌ Compra con ID {id_compra} no existe")
+                return {"error": "Compra no encontrada"}
+            compra_monto = compra[0]
+            
+            if not math.isclose(float(monto_pagado), float(compra_monto), rel_tol=1e-5):
+                print("El monto de pago debe ser igual al monto de la compra")
+                return {"error": "El monto de pago debe ser igual al monto de la compra"}
+            
+            # Eliminar la compra (o marcarla como pagada)
+            self.cursor.execute("DELETE FROM compras WHERE id = ?", (id_compra,))
+            
+            # Actualizar el cupo_disponible: se suma el monto pagado (liberando crédito)
+            self.cursor.execute("SELECT cupo_disponible FROM tarjeta WHERE numero_tarjeta = ?", (numero_tarjeta,))
+            cupo_actual = self.cursor.fetchone()[0]
+            nuevo_cupo = cupo_actual + float(monto_pagado)
+            self.cursor.execute("UPDATE tarjeta SET cupo_disponible = ? WHERE numero_tarjeta = ?", (nuevo_cupo, numero_tarjeta))
+            
+            # Insertar el registro de pago
+            self.cursor.execute(
+                "INSERT INTO pago (id_compra, numero_tarjeta, fecha_pago, monto_a_pagar, descripcion) VALUES (?,?,?,?,?)",
+                (id_compra, numero_tarjeta, fecha_pago, monto_pagado, descripcion)
+            )
+            self.conexion.commit()
+            return {"mensaje": "Pago registrado correctamente", "nuevo_cupo": nuevo_cupo}
+        except sqlite3.Error as e:
+            print(f"Error al registrar pago: {e}")
+            return {"error": f"Error al registrar el pago: {e}"}
 
     # Metodo para obtener todos los clientes
     def obtener_clientes(self):

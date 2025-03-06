@@ -7,6 +7,7 @@ class ClienteControlador:
         self.modelo = ClienteModelo()
         self.vista = vista
         self.ultimo_detalle = None
+        self.tarjeta_actual = None # Para almacenar la tarjeta actualmente consultada
         
         # Inicia un hilo en background para monitorizar la conexión
         threading.Thread(target=self.monitor_conexion, daemon=True).start()
@@ -46,13 +47,25 @@ class ClienteControlador:
         self.vista.page.window.destroy()  # O el método correspondiente para cerrar la aplicación
     
     def buscar_cliente_por_tarjeta(self, numero_tarjeta, fecha_inicio=None, fecha_fin=None):
+        # Liberar tarjeta anterior
+        if self.tarjeta_actual:
+            self.liberar_tarjeta(self.tarjeta_actual)
+        
+        # Bloquear nueva tarjeta
+        self.tarjeta_actual = numero_tarjeta
         detalle = self.modelo.obtener_detalle_por_tarjeta(numero_tarjeta, fecha_inicio, fecha_fin)
-        if "error" in detalle:
+        
+        if "error" in detalle and "ya está siendo consultado" in detalle["error"]:
             self.vista.mostrar_mensaje(detalle["error"])
-            self.vista.mostrar_registro_tarjeta()
+            self.tarjeta_actual = None
         else:
-            self.ultimo_detalle = detalle  # Guardamos el último detalle obtenido
+            self.ultimo_detalle = detalle
             self.vista.mostrar_detalle(detalle)
+
+    def liberar_tarjeta(self, numero_tarjeta):
+        datos = {"accion": "liberar_tarjeta", "numero_tarjeta": numero_tarjeta}
+        self.modelo.enviar_peticion(datos)
+        self.tarjeta_actual = None
 
     def registrar_tarjeta(self, datos):
         respuesta = self.modelo.enviar_peticion(datos)
@@ -63,6 +76,18 @@ class ClienteControlador:
         # Envía la petición al servidor para registrar la compra
         respuesta = self.modelo.enviar_peticion(datos)
         print("Respuesta del servidor (compra):", respuesta)  # Mensaje de depuración
+        return respuesta
+    
+    # Nueva función para registrar un pago
+    def registrar_pago(self, datos):
+        try:
+            # Se espera que datos["id_compra"] sea ya un string que contenga sólo el ID (ej. "3")
+            id_compra = int(datos["id_compra"])  # Convertir a entero
+            datos["compra_id"] = id_compra  # Asigna el valor convertido
+        except Exception as e:
+            return {"error": "Formato de ID de compra inválido"}
+        
+        respuesta = self.modelo.enviar_peticion(datos)
         return respuesta
 
 
