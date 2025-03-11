@@ -8,7 +8,7 @@ class BaseDeDatos:
     def __init__(self, db_nombre=None):
         # Si no se pasa un nombre, usa una ruta absoluta para el archivo
         if db_nombre is None:
-            db_nombre = r"C:\Users\Usuario\Desktop\Proyecto Cliente - Servidor\Servidor\banco_universidad.db"
+            db_nombre = r"C:\Cliente-Servidor\Servidor\banco_universidad.db"
 
         try:
             self.conexion = sqlite3.connect(db_nombre, check_same_thread=False)
