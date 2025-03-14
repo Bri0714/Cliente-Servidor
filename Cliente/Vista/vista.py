@@ -131,7 +131,7 @@ class ClienteVista:
         self.lbl_mensaje.value = mensaje
         self.page.update()
         # Después de 60 segundos se borra el mensaje
-        threading.Timer(20, self.clear_lbl_mensaje).start()
+        threading.Timer(2, self.clear_lbl_mensaje).start()
 
     def clear_lbl_mensaje(self):
         self.lbl_mensaje.value = ""
@@ -313,7 +313,7 @@ class ClienteVista:
             "monto": monto,
             "descripcion": descripcion
         }
-        respuesta = self.controlador.modelo.enviar_peticion(datos)
+        respuesta = self.controlador.registrar_compra(datos)
         if respuesta is None:
             self.mostrar_mensaje_temporal("Error de conexión: No se recibió respuesta del servidor")
         elif "mensaje" in respuesta:
@@ -328,7 +328,7 @@ class ClienteVista:
     def mostrar_registro_tarjeta(self):
         self.resetear_vista()
         self.aviso_registro.value = ("El número de la tarjeta no se encuentra registrado. "
-                                     "Registre el cliente para crear una tarjeta.")
+                                    "Registre el cliente para crear una tarjeta.")
         self.aviso_registro.visible = True
         self.radio_group.visible = True
         self.btn_siguiente_registro.visible = True

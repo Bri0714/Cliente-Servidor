@@ -8,7 +8,7 @@ class BaseDeDatos:
     def __init__(self, db_nombre=None):
         # Si no se pasa un nombre, usa una ruta absoluta para el archivo
         if db_nombre is None:
-            db_nombre = r"C:\Cliente-Servidor\Servidor\banco_universidad.db"
+            db_nombre = r"C:\Users\Usuario\Desktop\Proyecto Cliente - Servidor\Servidor\banco_universidad.db"
 
         try:
             self.conexion = sqlite3.connect(db_nombre, check_same_thread=False)
@@ -354,7 +354,7 @@ class BaseDeDatos:
                 return {"error": "El monto de pago debe ser igual al monto de la compra"}
             
             # Eliminar la compra (o marcarla como pagada)
-            #self.cursor.execute("DELETE FROM compras WHERE id = ?", (id_compra,))
+            self.cursor.execute("DELETE FROM compras WHERE id = ?", (id_compra,))
             
             # Actualizar el cupo_disponible: se suma el monto pagado (liberando crédito)
             self.cursor.execute("SELECT cupo_disponible FROM tarjeta WHERE numero_tarjeta = ?", (numero_tarjeta,))

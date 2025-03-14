@@ -1,0 +1,49 @@
+@startuml servidor
+title Diagrama de Clases - Servidor
+
+package "Modelo" {
+    class BaseDeDatos {
+        - conexion: sqlite3.Connection
+        - cursor: sqlite3.Cursor
+        + __init__(db_nombre: str = None)
+        + crear_tablas()
+        + verificar_y_precargar_datos()
+        + precargar_datos()
+        + obtener_detalle_cliente(id_cliente, fecha_inicio, fecha_fin)
+        + obtener_detalle_por_tarjeta(numero_tarjeta, fecha_inicio, fecha_fin)
+        + obtener_cliente_por_cedula(cedula)
+        + registrar_cliente(nombre, cedula, sueldo, edad)
+        + registrar_tarjeta(id_cliente, nombre_banco, numero_tarjeta, cupo_total)
+        + registrar_compra(numero_tarjeta, fecha, monto, descripcion)
+        + registrar_pago(numero_tarjeta, id_compra, fecha_pago, monto_pagado, descripcion)
+        + obtener_clientes()
+    }
+}
+
+package "Controlador" {
+    class Controlador {
+        - db: BaseDeDatos
+        - bloqueo: Lock
+        - tarjetas_bloqueadas: dict
+        + __init__()
+        + procesar_peticion(datos: dict)
+    }
+}
+
+package "Vista" {
+    class ServidorVista {
+        - host: str
+        - puerto: int
+        - servidor: socket.socket
+        - controlador: Controlador
+        + __init__(host: str = "localhost", puerto: int = 5000)
+        + iniciar_servidor()
+        + manejar_cliente(conexion)
+    }
+}
+
+' Relaciones entre clases
+Controlador --> BaseDeDatos : usa
+ServidorVista --> Controlador : instancia
+
+@enduml

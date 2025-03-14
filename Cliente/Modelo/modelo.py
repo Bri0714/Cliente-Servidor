@@ -2,13 +2,11 @@ import socket
 import json
 
 class ClienteModelo:
-    #Clase encargada de la comunicación con el servidor
-
     def __init__(self, host="localhost", puerto=9000):
         self.host = host
         self.puerto = puerto
-        self.sock = None  # Atributo para la conexión persistente
-        self.conectar_persistente()  # Establece la conexión persistente al iniciar
+        self.sock = None  # Conexión persistente
+        self.welcome_received = False
 
     def conectar_persistente(self):
         """Establece una conexión persistente con el balanceador/servidor."""
@@ -16,7 +14,15 @@ class ClienteModelo:
             try:
                 self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
                 self.sock.connect((self.host, self.puerto))
-                print("Conexión persistente establecida con el balanceador.")
+                # Recibir el mensaje de bienvenida
+                data = self.sock.recv(4096)
+                if data:
+                    welcome = json.loads(data.decode("utf-8"))
+                    print(welcome["mensaje"])
+                    self.welcome_received = True
+                    return welcome
+                else:
+                    return {"error": "No se recibió mensaje de bienvenida."}
             except Exception as e:
                 self.sock = None
                 print("Error en conexión persistente:", e)
@@ -24,23 +30,21 @@ class ClienteModelo:
         return {"estado": "conectado"}
 
     def enviar_peticion(self, datos):
-        """Envía una petición JSON al servidor y recibe la respuesta"""
         try:
-            # Se utiliza la conexión persistente si está disponible
-            if self.sock is None:
-                # En caso de no haber conexión persistente, se crea una conexión temporal
-                cliente = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-                cliente.connect((self.host, self.puerto))
-                cliente.sendall(json.dumps(datos).encode("utf-8"))
-                respuesta = json.loads(cliente.recv(4096).decode("utf-8"))
-                cliente.close()
-                return respuesta
-            else:
+            if self.sock is not None:
                 self.sock.sendall(json.dumps(datos).encode("utf-8"))
                 respuesta = json.loads(self.sock.recv(4096).decode("utf-8"))
                 return respuesta
+            else:
+                temp_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                temp_sock.connect((self.host, self.puerto))
+                temp_sock.recv(4096)  # Descartar mensaje de bienvenida
+                temp_sock.sendall(json.dumps(datos).encode("utf-8"))
+                respuesta = json.loads(temp_sock.recv(4096).decode("utf-8"))
+                temp_sock.close()
+                return respuesta
         except Exception as e:
-            # Si ocurre un error, se cierra la conexión persistente para que se pueda reestablecer
+            # Al detectar error, cerramos la conexión persistente y dejamos que el monitor se encargue de reconectar.
             if self.sock is not None:
                 try:
                     self.sock.close()
@@ -48,6 +52,7 @@ class ClienteModelo:
                     pass
                 self.sock = None
             return {"error": f"Error de conexión: {e}"}
+
         
     def conectar(self):
         return self.enviar_peticion({"accion": "ping"})

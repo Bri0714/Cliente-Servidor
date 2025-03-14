@@ -7,75 +7,91 @@ class ClienteControlador:
         self.modelo = ClienteModelo()
         self.vista = vista
         self.ultimo_detalle = None
-        self.tarjeta_actual = None # Para almacenar la tarjeta actualmente consultada
-        
+        self.tarjeta_actual = None  # Para almacenar la tarjeta actualmente consultada
+        self.pending_actions = []   # Cola para almacenar acciones pendientes en caso de fallo
+
         # Inicia un hilo en background para monitorizar la conexión
-        threading.Thread(target=self.monitor_conexion, daemon=True).start()
+        #threading.Thread(target=self.monitor_conexion, daemon=True).start()
         
+
     def monitor_conexion(self):
-        """Monitorea la conexión al servidor cada 10 segundos y, si se detecta caída, intenta reconectar automáticamente."""
         while True:
-            time.sleep(10)  # Revisa cada 10 segundos
+            time.sleep(10)
             respuesta = self.modelo.conectar()  # Realiza un ping
-            if "mensaje" not in respuesta:
-                # El servidor no respondió; mostrar mensaje y forzar reconexión
+            if "mensaje" in respuesta:
+                self.procesar_acciones_pendientes()
+            else:
+                # Si falla el ping, se notifica y se reconecta automáticamente
+                print("Conexión perdida, intentando reconectar automáticamente...")
+                self.vista.conectado = False
                 self.vista.mostrar_mensaje("El servidor se ha caído, reconectando...")
+                # Se llama a reconectar sin necesidad de acción del usuario
                 self.conectar_al_servidor()
-            # Si se recibe el "ping", no se hace nada (opcionalmente, podrías actualizar un estado en la vista)
+
 
     def conectar_al_servidor(self):
         max_reintentos = 5
         for intento in range(1, max_reintentos + 1):
-            respuesta = self.modelo.conectar()
-            if "mensaje" in respuesta:
-                mensaje = respuesta["mensaje"]
-                # Se muestra el mensaje en la consola y en la vista.
+            respuesta = self.modelo.conectar_persistente()
+            if "estado" in respuesta and respuesta["estado"] == "conectado":
+                puerto = respuesta.get("puerto")
+                mensaje = f"Cliente conectado exitosamente a puerto {puerto}."
                 print(mensaje)
                 self.vista.mostrar_mensaje(mensaje)
                 self.vista.habilitar_ver_detalles()
+                self.vista.conectado = True  # Se marca que ya se conectó
+                # Iniciamos el monitor (si aún no está en ejecución)
+                if not hasattr(self.vista, "monitor_enabled") or not self.vista.monitor_enabled:
+                    self.vista.monitor_enabled = True
+                    threading.Thread(target=self.monitor_conexion, daemon=True).start()
                 return True
             else:
                 reintento_msg = f"{intento} reintento de conexión"
                 print(reintento_msg)
                 self.vista.mostrar_mensaje(reintento_msg)
                 if intento < max_reintentos:
-                    time.sleep(60)  # Espera 1 minuto antes del siguiente intento.
-        # Si después de 5 intentos aún no se conecta:
+                    time.sleep(25)
         error_msg = "No se pudo conectar al servidor, cerrando el cliente."
         print(error_msg)
         self.vista.mostrar_mensaje(error_msg)
-        self.vista.page.window.destroy()  # O el método correspondiente para cerrar la aplicación
-    
-    #def buscar_cliente_por_tarjeta(self, numero_tarjeta, fecha_inicio=None, fecha_fin=None):
-    #    # Liberar tarjeta anterior
-    #    if self.tarjeta_actual:
-    #        self.liberar_tarjeta(self.tarjeta_actual)
-    #    
-    #    # Bloquear nueva tarjeta
-    #    self.tarjeta_actual = numero_tarjeta
-    #    detalle = self.modelo.obtener_detalle_por_tarjeta(numero_tarjeta, fecha_inicio, fecha_fin)
-    #    
-    #    if "error" in detalle and "ya está siendo consultado" in detalle["error"]:
-    #        self.vista.mostrar_mensaje(detalle["error"])
-    #        self.tarjeta_actual = None
-    #    else:
-    #        self.ultimo_detalle = detalle
-    #        self.vista.mostrar_detalle(detalle)
-#
-    #def liberar_tarjeta(self, numero_tarjeta):
-    #    datos = {"accion": "liberar_tarjeta", "numero_tarjeta": numero_tarjeta}
-    #    self.modelo.enviar_peticion(datos)
-    #    self.tarjeta_actual = None
-    
+        self.vista.page.window.destroy()
+
+
+    def agregar_a_cola(self, accion, datos):
+        """Agrega una acción pendiente a la cola para reenvío al reconectar."""
+        self.pending_actions.append((accion, datos))
+        self.vista.mostrar_mensaje(f"Acción '{accion}' agregada a la cola y se enviará al reconectar.")
+
+    def procesar_acciones_pendientes(self):
+        """Recorre la cola de acciones pendientes y reenvía cada petición que se procese correctamente."""
+        if not self.pending_actions:
+            return
+
+        # Se recorre una copia de la cola para eliminar elementos sin problemas
+        for accion, datos in self.pending_actions.copy():
+            respuesta = self.modelo.enviar_peticion(datos)
+            if "error" not in respuesta:
+                self.pending_actions.remove((accion, datos))
+                self.vista.mostrar_mensaje(f"Acción '{accion}' procesada correctamente.")
+                print(f"Acción '{accion}' procesada: {respuesta}")
+            else:
+                print(f"Reintento de '{accion}' fallido: {respuesta['error']}")
+
+    # --- Métodos existentes ---
+
     # Liberar tarjeta anterior ANTES de asignar la nueva
     def buscar_cliente_por_tarjeta(self, numero_tarjeta, fecha_inicio=None, fecha_fin=None):
         if self.tarjeta_actual:
             self.liberar_tarjeta(self.tarjeta_actual)
             self.tarjeta_actual = None  # Asegurar que se borra la referencia
-        
-        # Bloquear nueva tarjeta SOLO si la consulta es exitosa
+
         detalle = self.modelo.obtener_detalle_por_tarjeta(numero_tarjeta, fecha_inicio, fecha_fin)
         
+        # Si se recibió un mensaje de redirección, lo mostramos y salimos
+        if "estado" in detalle and detalle["estado"] == "redirigido":
+            self.vista.mostrar_mensaje(detalle["mensaje"])
+            return
+
         if "error" in detalle:
             if "ya está siendo consultado" in detalle["error"]:
                 self.vista.mostrar_mensaje(detalle["error"])
@@ -84,6 +100,7 @@ class ClienteControlador:
             self.tarjeta_actual = numero_tarjeta  # Asignar solo si no hay error
             self.ultimo_detalle = detalle
             self.vista.mostrar_detalle(detalle)
+
 
     def liberar_tarjeta(self, numero_tarjeta):
         if numero_tarjeta:
@@ -100,40 +117,36 @@ class ClienteControlador:
     def registrar_tarjeta(self, datos):
         respuesta = self.modelo.enviar_peticion(datos)
         print("Respuesta del servidor:", respuesta)  # Debugging
+        if "error" in respuesta and "conexión" in respuesta["error"].lower():
+            self.agregar_a_cola("registrar_tarjeta", datos)
         return respuesta
     
     def registrar_compra(self, datos):
         # Envía la petición al servidor para registrar la compra
         respuesta = self.modelo.enviar_peticion(datos)
-        print("Respuesta del servidor (compra):", respuesta)  # Mensaje de depuración
+        print("Respuesta del servidor (compra):", respuesta)
+        # Si hay un error o no se recibió una respuesta con el campo esperado (por ejemplo, "mensaje" o "estado")
+        if "error" in respuesta or "mensaje" not in respuesta:
+            self.agregar_a_cola("registrar_compra", datos)
         return respuesta
+
     
-    # Nueva función para registrar un pago
     def registrar_pago(self, datos):
         try:
-            # Se espera que datos["id_compra"] sea ya un string que contenga sólo el ID (ej. "3")
-            id_compra = int(datos["id_compra"])  # Convertir a entero
+            # Se espera que datos["id_compra"] sea un string conteniendo solo el ID (por ejemplo, "3")
+            id_compra = int(datos["id_compra"])
             datos["compra_id"] = id_compra  # Asigna el valor convertido
         except Exception as e:
             return {"error": "Formato de ID de compra inválido"}
         
         respuesta = self.modelo.enviar_peticion(datos)
+        if "error" in respuesta and "conexión" in respuesta["error"].lower():
+            self.agregar_a_cola("registrar_pago", datos)
         return respuesta
 
-
-    #def cargar_clientes(self):
-    #    #Obtiene la lista de clientes y la envía a la vista
-    #    clientes = self.modelo.obtener_clientes()
-    #    if "clientes" in clientes:
-    #        self.vista.mostrar_clientes(clientes["clientes"])
-    #    else:
-    #        self.vista.mostrar_mensaje("Error al obtener clientes")
-    
-        
     def buscar_cliente_por_cedula(self, cedula):
         datos = {"accion": "buscar_cliente_por_cedula", "cedula": cedula}
         return self.modelo.enviar_peticion(datos)
-
 
     def registrar_cliente_nuevo(self, nombre, cedula, sueldo, edad):
         datos = {
@@ -153,11 +166,9 @@ class ClienteControlador:
             self.vista.mostrar_mensaje("No hay compras para mostrar")
             
     def mostrar_detalle_cliente(self, id_cliente, fecha_inicio=None, fecha_fin=None):
-        #Obtiene los detalles del cliente y los envía a la vista
+        # Obtiene los detalles del cliente y los envía a la vista
         detalle = self.modelo.obtener_detalle_cliente(id_cliente, fecha_inicio, fecha_fin)
         if "error" in detalle:
             self.vista.mostrar_mensaje(detalle["error"])
         else:
             self.vista.mostrar_detalle(detalle)
-
-

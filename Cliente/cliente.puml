@@ -1,0 +1,117 @@
+@startuml
+title Diagrama de Clases - Cliente (Modelo, Controlador, Vista y Main)
+
+package "Modelo" {
+  class ClienteModelo {
+    - host: str = "localhost"
+    - puerto: int = 5000
+    + __init__(host: str = "localhost", puerto: int = 5000)
+    + enviar_peticion(datos: dict) : dict
+    + conectar() : dict
+    + obtener_detalle_por_tarjeta(numero_tarjeta: str, fecha_inicio: str = None, fecha_fin: str = None) : dict
+  }
+}
+
+package "Controlador" {
+  class ClienteControlador {
+    - modelo: ClienteModelo
+    - vista: ClienteVista
+    - ultimo_detalle: dict
+    - tarjeta_actual: str
+    + __init__(vista: ClienteVista)
+    + monitor_conexion() : void
+    + conectar_al_servidor() : bool
+    + buscar_cliente_por_tarjeta(numero_tarjeta: str, fecha_inicio: str = None, fecha_fin: str = None) : void
+    + liberar_tarjeta(numero_tarjeta: str) : void
+    + registrar_tarjeta(datos: dict) : dict
+    + registrar_compra(datos: dict) : dict
+    + registrar_pago(datos: dict) : dict
+    + buscar_cliente_por_cedula(cedula: str) : dict
+    + registrar_cliente_nuevo(nombre: str, cedula: str, sueldo, edad) : dict
+    + mostrar_compras() : void
+    + mostrar_detalle_cliente(id_cliente, fecha_inicio: str = None, fecha_fin: str = None) : void
+  }
+}
+
+package "Vista" {
+  class ClienteVista {
+    - page: ft.Page
+    - controlador: ClienteControlador
+    - conectado: bool
+    - cliente_id: int
+    - cliente_sueldo: float
+    - lbl_mensaje: ft.Text
+    - txt_tarjeta: ft.TextField
+    - fecha_inicio: ft.TextField
+    - fecha_fin: ft.TextField
+    - btn_conectar: ft.ElevatedButton
+    - btn_ver_detalles: ft.ElevatedButton
+    - btn_compras: ft.ElevatedButton
+    - detalles_cliente: ft.Text
+    - aviso_registro: ft.Text
+    - radio_group: ft.RadioGroup
+    - txt_cedula_existente: ft.TextField
+    - txt_nuevo_nombre: ft.TextField
+    - txt_nueva_cedula: ft.TextField
+    - txt_nuevo_sueldo: ft.TextField
+    - txt_nueva_edad: ft.TextField
+    - btn_siguiente_registro: ft.ElevatedButton
+    - btn_atras: ft.ElevatedButton
+    - txt_nombre_banco: ft.TextField
+    - txt_cupo_total: ft.TextField
+    - btn_crear_tarjeta: ft.ElevatedButton
+    - btn_registrar_compra: ft.ElevatedButton
+    - txt_fecha_compra: ft.TextField
+    - txt_monto_compra: ft.TextField
+    - txt_descripcion_compra: ft.TextField
+    - btn_confirmar_compra: ft.ElevatedButton
+    - btn_cancelar_compra: ft.ElevatedButton
+    - btn_generar_pago: ft.ElevatedButton
+    - dropdown_compras_pago: ft.Dropdown
+    - txt_fecha_pago: ft.TextField
+    - txt_monto_pago: ft.TextField
+    - txt_descripcion_pago: ft.TextField
+    - btn_confirmar_pago: ft.ElevatedButton
+    - btn_cancelar_pago: ft.ElevatedButton
+    + __init__(page: ft.Page)
+    + on_window_event(e) : void
+    + mostrar_mensaje_temporal(mensaje: str) : void
+    + clear_lbl_mensaje() : void
+    + resetear_vista() : void
+    + conectar_al_servidor(e) : void
+    + habilitar_ver_detalles() : void
+    + ver_detalles(e) : void
+    + ocultar_registro(e) : void
+    + mostrar_detalle(detalle: dict) : void
+    + mostrar_compras(e) : void
+    + mostrar_formulario_compra(e) : void
+    + ocultar_formulario_compra(e) : void
+    + registrar_compra(e) : void
+    + mostrar_registro_tarjeta() : void
+    + on_radio_group_change(e) : void
+    + procesar_registro_cliente(e) : void
+    + mostrar_campos_tarjeta() : void
+    + registrar_tarjeta(e) : void
+    + formatear_pesos(valor: float) : str
+    + llenar_dropdown_pago(compras: list) : void
+    + seleccionar_compra(e) : void
+    + mostrar_formulario_pago(e) : void
+    + ocultar_formulario_pago(e) : void
+    + registrar_pago(e) : void
+    + mostrar_mensaje(mensaje: str) : void
+  }
+}
+
+package "Main" {
+  class Main {
+    + main(page: ft.Page) : void
+  }
+}
+
+' Relaciones entre los componentes
+ClienteControlador --> ClienteModelo : utiliza
+ClienteVista --> ClienteControlador : instancia
+ClienteControlador --> ClienteVista : referencia
+Main ..> ClienteVista : crea instancia
+
+@enduml
